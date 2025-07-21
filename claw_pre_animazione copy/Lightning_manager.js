@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export class LightingManager {
     constructor() {
@@ -15,6 +16,7 @@ export class LightingManager {
             sideLight1: null,
             sideLight2: null,
             centerLight: null,
+            ceilingLeds: [], // Array for all ceiling light components
             // Arrays for grouped lights
             wallWashers: [],
             ceilingGrid: [],
@@ -96,7 +98,7 @@ export class LightingManager {
         clawSupport2.position.set(this.machineOffset.x - 3, 5, this.machineOffset.z + 2);
         this.scene.add(clawSupport2);
         
-        // 🆕 CANDY MACHINE AREA LIGHTING - MORE DIFFUSED
+        // �� CANDY MACHINE AREA LIGHTING - MORE DIFFUSED
         this.lightReferences.candySpotlight = new THREE.SpotLight(0x4444ff, 3.5, 20, Math.PI / 2, 0.8);
         this.lightReferences.candySpotlight.position.set(this.candyMachineOffset.x, 7, this.candyMachineOffset.z + 3);
         this.lightReferences.candySpotlight.target.position.set(this.candyMachineOffset.x, 0, this.candyMachineOffset.z);
@@ -143,21 +145,12 @@ export class LightingManager {
             this.lightReferences.wallWashers.push(backWallWasher);
         }
         
-        // 🆕 CEILING LIGHT GRID
-        this.lightReferences.ceilingGrid = [];
-        for (let x = -6; x <= 6; x += 4) {
-            for (let z = -4; z <= 4; z += 4) {
-                const ceilingLight = new THREE.PointLight(0xffffff, 1.2, 8);
-                ceilingLight.position.set(x, 7, z);
-                this.scene.add(ceilingLight);
-                this.lightReferences.ceilingGrid.push(ceilingLight);
-            }
-        }
+        this.setupCeilingLights();
         
         // Main center lights
-        this.lightReferences.centerLight = new THREE.PointLight(0xffffff, 2.0, 15);
-        this.lightReferences.centerLight.position.set(0, 6, 0);
-        this.scene.add(this.lightReferences.centerLight);
+        // this.lightReferences.centerLight = new THREE.PointLight(0xffffff, 2.0, 15);
+        // this.lightReferences.centerLight.position.set(0, 6, 0);
+        // this.scene.add(this.lightReferences.centerLight);
         
         // Store support lights for color control
         this.lightReferences.clawSupports = [clawSupport1, clawSupport2];
@@ -167,6 +160,57 @@ export class LightingManager {
         this.createWallLeds();
         
         console.log("🌈 Enhanced diffused lighting system created");
+    }
+
+    setupCeilingLights() {
+        const loader = new GLTFLoader();
+        loader.load('led_light.glb', (gltf) => {
+            const ledTemplate = gltf.scene;
+
+            // Define positions for the three LED fixtures
+            const positions = [
+                new THREE.Vector3(0, 7, 0),
+                new THREE.Vector3(-6, 7, 0),
+                new THREE.Vector3(6, 7, 0)
+            ];
+
+            positions.forEach(pos => {
+                const ledModel = ledTemplate.clone(true); // Deep clone the model
+                ledModel.position.copy(pos);
+                ledModel.scale.set(2, 2, 2);
+                this.scene.add(ledModel);
+
+                const light1Mesh = ledModel.getObjectByName('light1');
+                const light2Mesh = ledModel.getObjectByName('light2');
+                
+                // Helper to create a light and attach it
+                const createLight = (mesh) => {
+                    if (!mesh) return null;
+                    
+                    // Make the mesh itself glow
+                    mesh.material = new THREE.MeshStandardMaterial({
+                        emissive: 0xffffff, // Start with white glow
+                        emissiveIntensity: 0.0, // Will be controlled by main intensity
+                    });
+
+                    const pointLight = new THREE.PointLight(0xffffff, 1.5, 20);
+                    pointLight.position.copy(mesh.position);
+                    ledModel.add(pointLight);
+
+                    // Store references to both the light and its mesh for color updates
+                    this.lightReferences.ceilingLeds.push({ light: pointLight, mesh: mesh });
+                    return pointLight;
+                };
+
+                createLight(light1Mesh);
+                createLight(light2Mesh);
+            });
+            
+            console.log(`✅ Created ${this.lightReferences.ceilingLeds.length} ceiling lights from led_light.glb.`);
+
+        }, undefined, (error) => {
+            console.error("❌ Failed to load led_light.glb for ceiling", error);
+        });
     }
 
     createLedPaths() {
@@ -416,13 +460,16 @@ export class LightingManager {
                 }
                 break;
             case 'center':
-                if (this.lightReferences.centerLight) {
-                    this.lightReferences.centerLight.color.copy(color);
-                }
+                // if (this.lightReferences.centerLight) {
+                //     this.lightReferences.centerLight.color.copy(color);
+                // }
                 // Update ceiling grid
-                if (this.lightReferences.ceilingGrid) {
-                    this.lightReferences.ceilingGrid.forEach(light => light.color.copy(color));
-                }
+                this.lightReferences.ceilingLeds.forEach(led => {
+                    led.light.color.copy(color);
+                    if (led.mesh) {
+                        led.mesh.material.emissive.copy(color);
+                    }
+                });
                 break;
         }
     }
@@ -457,12 +504,16 @@ export class LightingManager {
                 }
                 break;
             case 'center':
-                if (this.lightReferences.centerLight) {
-                    this.lightReferences.centerLight.intensity = intensity * 1.5;
-                }
-                if (this.lightReferences.ceilingGrid) {
-                    this.lightReferences.ceilingGrid.forEach(light => light.intensity = intensity * 0.8);
-                }
+                // if (this.lightReferences.centerLight) {
+                //     this.lightReferences.centerLight.intensity = intensity * 1.5;
+                // }
+                this.lightReferences.ceilingLeds.forEach(led => {
+                    led.light.intensity = intensity * 0.8; // Adjust intensity for each point light
+                    if (led.mesh) {
+                        // Link emissive intensity to the light's intensity
+                        led.mesh.material.emissiveIntensity = intensity;
+                    }
+                });
                 break;
         }
     }

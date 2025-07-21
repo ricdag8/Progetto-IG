@@ -89,14 +89,21 @@ export class HomepageManager {
     }
     
     _selectCharacter(index) {
-        if (index < 0 || index >= this.characterModels.length) return;
+        let selectionIndex = index;
+        if (index === 0) {
+            selectionIndex = 1;
+        } else if (index === 1) {
+            selectionIndex = 0;
+        }
+
+        if (selectionIndex < 0 || selectionIndex >= this.characterModels.length) return;
 
         // Deselect the previously selected character
         if (this.selectedCharacterIndex !== -1 && this.characterModels[this.selectedCharacterIndex]) {
             this.characterModels[this.selectedCharacterIndex].scale.setScalar(2); // Return to normal size
         }
 
-        this.selectedCharacterIndex = index;
+        this.selectedCharacterIndex = selectionIndex;
 
         // Select the new character
         if (this.characterModels[this.selectedCharacterIndex]) {
