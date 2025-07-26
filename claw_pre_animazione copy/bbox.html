@@ -15,13 +15,11 @@
 </div>
 
 <!-- 🆕 CHARACTER SELECTION SCREEN -->
-<div id="characterSelectionScreen" class="overlay-screen" style="display: none;">
-    <h2>Select a Character</h2>
-    <!-- 3D rotation controls -->
-    <div class="character-controls">
-        <span>Click a character to select. Click and drag to rotate.</span>
-    </div>
-    <button id="startGameBtn" class="start-game-button">Start Game</button>
+<div id="characterSelectionScreen" class="overlay-screen" style="display: none; flex-direction: column; justify-content: space-between;">
+    <h2 style="margin-top: 60px; margin-bottom: 0; font-size: 3em;">Select a Character</h2>
+    <!-- Qui viene renderizzata la scena 3D dei personaggi -->
+    <div style="flex: 1;"></div>
+    <button id="startGameBtn" class="start-game-button" style="margin-bottom: 60px;">Start Game</button>
 </div>
 
 <!-- 🆕 PAUSE MENU -->
@@ -34,7 +32,7 @@
     </div>
 </div>
 
-<div id="controls">
+<div id="controls" style="display: none;">
   <strong>Claw Machine</strong><br>
   
   <div style="margin: 8px 0; display: flex; align-items: center; gap: 15px;">
@@ -88,12 +86,13 @@
   font-size: 14px;
   font-weight: bold;
   z-index: 1000;
+  display: none;
 ">
   Exploration Mode - WASD to move
 </div>
 
 <!-- 🆕 PULSANTE PER TOGGLE CONTROLLI LUCE -->
-<button id="toggleLightControls">🎨 Lights</button>
+<button id="toggleLightControls" style="display: none;">🎨 Lights</button>
 
 <!-- 🆕 PANNELLO CONTROLLI MIGLIORATO CON SCROLL -->
 <div id="lightControls" style="display: none;">
@@ -160,11 +159,24 @@
     </div>
     <input type="color" id="centerLightColor" value="#ffffff">
     <div class="intensity-control">
-      <label>Intensity: <span id="centerIntensityValue">0.8</span></label>
-      <input type="range" id="centerLightIntensity" min="0" max="2" step="0.1" value="0.8">
+      <label>Intensity: <span id="centerIntensityValue">10.0</span></label>
+      <input type="range" id="centerLightIntensity" min="0" max="15" step="0.1" value="10.0">
     </div>
   </div>
   
+  <!-- 🆕 CONTROLLO LUCI QUADRI -->
+  <div class="light-control">
+    <div class="light-name">
+      <div class="light-preview" id="paintingsLightPreview" style="background-color: #ffffff;"></div>
+      Painting Spotlights
+    </div>
+    <input type="color" id="paintingsLightColor" value="#ffffff">
+    <div class="intensity-control">
+      <label>Intensity: <span id="paintingsIntensityValue">1.5</span></label>
+      <input type="range" id="paintingsLightIntensity" min="0" max="5" step="0.1" value="1.5">
+    </div>
+  </div>
+
   <!-- 🆕 PRESET BUTTONS CON NUOVI STILI -->
   <div class="preset-buttons">
     <strong>Presets:</strong><br>
@@ -205,6 +217,8 @@
     import { LightingManager } from './Lightning_manager.js';
     import { RoomSetupManager, InteractionZone } from './Room_setup.js';
     import { HomepageManager } from './Homepage.js';
+    import { AudioManager } from './AudioManager.js';
+    import { PopcornManager } from './popcorn.js';
     
         // 🆕 ROOM SETUP AND MACHINE LOADING NOW MOVED TO Room_setup.js
     
@@ -238,6 +252,9 @@
     // 🆕 UI ELEMENTS
     let interactionPrompt = null;
     
+    // 🆕 AUDIO - NOW MANAGED BY AudioManager
+    let audioManager = null;
+
     // 🆕 LIGHTING SYSTEM - NOW MOVED TO Lightning_manager.js
     let lightingManager = null;
     let lightReferences = null; // Will reference lightingManager.lightReferences
@@ -254,6 +271,9 @@
    
     let coins = 5;
     let isGameOver = false;
+
+    let popcornManager;
+let popcornSpawnPoint;
 
     // --- Make newGame function available globally ---
     window.newGame = newGame;
@@ -386,6 +406,10 @@ function updateExplosions(deltaTime) {
 
 function startPrizeAnimation(body) {
     console.log(`🏆 Animazione finale avviata per ${body.mesh.name}!`);
+    
+    // 🆕 Riproduci il suono di vittoria tramite AudioManager
+    audioManager.playSound('prizeWin');
+
     // Aggiunge la stella alla lista delle animazioni da eseguire
     animatingPrizes.push({
         body: body,
@@ -617,6 +641,36 @@ function updateCandyAnimations(deltaTime) {
             }
         });
     }
+// in bbox.html, aggiungi questa nuova funzione
+
+function tryInitializePopcornManager() {
+    if (!scene || !popcornSpawnPoint) return;
+
+    // Raccogli gli oggetti con cui i popcorn devono collidere
+    // Per ora, solo il pavimento della stanza
+    // const floor = scene.getObjectByName('Floor');
+    // if (floor) {
+    //     collidersForPopcorn.push(floor);
+    // }
+    // Aggiungiamo anche la macchina dei popcorn stessa
+    if (popcornMachineMesh) {
+        collidersForPopcorn.push(popcornMachineMesh);
+    }
+
+    // Passa i collisori al manager, che li passerà a ogni particella
+    popcornManager = new PopcornManager({
+        scene: scene,
+        spawnMesh: popcornSpawnPoint,
+        count: 20, // Un buon numero di popcorn
+        gravity: 0.02,
+        baseScale: 0.08,
+        // 🍿 Passiamo i collisori!
+        colliders: collidersForPopcorn
+    });
+
+    console.log("✅ Popcorn Manager inizializzato!");
+}
+
 
 
 function tryInitializeClawController() {
@@ -739,6 +793,26 @@ function resetObjects() {
       scene.background = new THREE.Color(0x1a1a2e); // Colore più scuro per una sala giochi
       camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100);
       
+      // 🆕 INITIALIZE AUDIO MANAGER
+      audioManager = new AudioManager();
+      audioManager.initialize(camera);
+      // ⚠️ ASSICURATI DI AVERE I FILE AUDIO NELLA CARTELLA 'sounds/'
+      audioManager.loadSound('prizeWin', 'sounds/success-1-6297.mp3');
+      audioManager.loadSound('prizeWin', 'sounds/goodresult-82807.mp3');
+      audioManager.loadSound('prizeWin', 'sounds/winner-bell-game-show-91932.mp3');
+
+      // 🆕 LOAD BACKGROUND MUSIC (loop = true)
+      audioManager.loadSound('arcade', 'sounds/background music/bgm-arcade.mp3', 0.2, true);
+      audioManager.loadSound('neon', 'sounds/background music/bgm-neon.mp3', 0.2, true);
+      audioManager.loadSound('warm', 'sounds/background music/bgm-warm.mp3', 0.2, true);
+      audioManager.loadSound('cool', 'sounds/background music/bgm-cool.mp3', 0.8, true);
+      audioManager.loadSound('dark', 'sounds/background music/bgm-dark.mp3', 0.2, true);
+      
+      // 🆕 LOAD CHARACTER-SPECIFIC SOUNDS
+      audioManager.loadSound('Businessman_wave', 'sounds/character/businessman_hello.mp3', 0.8);
+      audioManager.loadSound('Hoodie_wave', 'sounds/character/hoodie_hey.mp3', 0.8);
+      audioManager.loadSound('Worker_wave', 'sounds/character/worker_hey.mp3', 0.8);
+      
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(window.devicePixelRatio);
@@ -750,15 +824,15 @@ function resetObjects() {
       // 🆕 INIT PHYSICS ENGINE FIRST
       physicsEngine = new PhysicsEngine();
       
-      // 🆕 SETUP PLAYER SYSTEM (but don't load character yet)
-      playerController = new PlayerController(scene, physicsEngine, roomSetupManager);
+      // 🆕 SETUP PLAYER SYSTEM (but don't load character yet) - Pass AudioManager
+      playerController = new PlayerController(scene, physicsEngine, roomSetupManager, audioManager);
       
       // 🆕 SETUP CAMERA SYSTEM (without target initially)
       cameraManager = new CameraManager(camera);
       cameraManager.initialize(scene);
       
-      // 🆕 SETUP HOMEPAGE MANAGER
-      homepageManager = new HomepageManager(playerController, cameraManager, initializeGame);
+      // 🆕 SETUP HOMEPAGE MANAGER - Pass AudioManager
+      homepageManager = new HomepageManager(playerController, cameraManager, initializeGame, audioManager);
       
       // 🆕 DISABLE ORBIT CONTROLS IN EXPLORATION MODE
       controls = new OrbitControls(camera, renderer.domElement);
@@ -791,15 +865,120 @@ function resetObjects() {
       // 🆕 CREATE GAME ROOM AND LOAD MACHINES
       roomSetupManager.createGameRoom();
       
+      // 🆕 LINK ROOM MATERIALS TO LIGHTING MANAGER
+      const roomMaterials = roomSetupManager.getRoomMaterials();
+      lightingManager.setRoomMaterials(roomMaterials);
+      
+      // 🆕 LINK PAINTING LIGHTS TO LIGHTING MANAGER
+      const paintingLights = roomSetupManager.getPaintingSpotlights();
+      lightingManager.addPaintingLights(paintingLights);
+      
              // 🆕 LOAD ALL MACHINES ASYNCHRONOUSLY
        roomSetupManager.loadAllMachines().then((results) => {
            console.log("✅ All machines loaded, setting up compatibility references...");
            setupCompatibilityReferences();
+         
            
            // 🆕 SET CANDY MACHINE CALLBACK
            if (candyMachine) {
                candyMachine.onCandyEjected = startCandyDisappearanceAnimation;
            }
+
+
+       // =================== 🍿 INSERISCI QUESTO BLOCCO QUI ===================
+// in bbox.html, nel .then() di loadAllMachines
+
+// =================== 🍿 SOSTITUISCI IL VECCHIO BLOCCO CON QUESTO ===================
+// =================== 🍿 SOSTITUISCI IL VECCHIO BLOCCO CON QUESTO ===================
+const loader = new GLTFLoader();
+loader.load('popcorn_machine.glb', (gltf) => {
+    const popcornMachineMesh = gltf.scene;
+    popcornMachineMesh.scale.set(0.5, 0.5, 0.5);
+    popcornMachineMesh.position.set(-3, 0.7, -2);
+    popcornMachineMesh.rotation.y = Math.PI / 2;
+    scene.add(popcornMachineMesh);
+    popcornMachineMesh.updateMatrixWorld(true);
+    let firstMeshFallback = null;
+    let popcornContainerMesh = null;
+    let popcornSpawnPoint = null;
+
+    popcornMachineMesh.traverse(child => {
+        if (child.isMesh) {
+            child.geometry.computeVertexNormals();
+            child.geometry.boundsTree = new MeshBVH(child.geometry);
+            physicsEngine.addStaticCollider(child);
+
+            if (child.name === 'Cylinder042__0') {
+                popcornSpawnPoint = child;
+            }
+            if (child.name === 'Box002_09_-_Default_0') {
+                popcornContainerMesh = child;
+            }
+            if (!firstMeshFallback) {
+                firstMeshFallback = child;
+            }
+        }
+    });
+
+    if (!popcornSpawnPoint) {
+        console.warn("ATTENZIONE: Mesh 'SpawnPoint_Popcorn' non trovata. Uso la prima mesh come fallback.");
+        popcornSpawnPoint = firstMeshFallback;
+    }
+
+    let finalContainer = popcornContainerMesh;
+
+    if (popcornContainerMesh) {
+        const originalBox = new THREE.Box3().setFromObject(popcornContainerMesh);
+        const originalSize = new THREE.Vector3();
+        const originalCenter = new THREE.Vector3();
+        originalBox.getSize(originalSize);
+        originalBox.getCenter(originalCenter);
+// Per modificare SOLO l'altezza (Y), usa questo codice:
+const newSize = originalSize.multiplyScalar(0.9).clone(); // Crea una copia per non toccare le dimensioni originali
+newSize.y *= 0.5; // Esempio: imposta l'altezza al 50% dell'originale
+originalCenter.y += 0.37;
+const smallerGeometry = new THREE.BoxGeometry(newSize.x, newSize.y, newSize.z);
+
+        // --- MODIFICA QUI ---
+        // 1. Crea un materiale verde e wireframe per rendere visibile l'helper
+        const helperMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00, // Verde
+            wireframe: true
+        });
+        const smallerContainerHelper = new THREE.Mesh(smallerGeometry, helperMaterial);
+        // --- FINE MODIFICA ---
+
+        smallerContainerHelper.position.copy(originalCenter);
+        smallerContainerHelper.quaternion.copy(popcornContainerMesh.quaternion);
+        
+        // Non è più necessario `visible = false`
+        scene.add(smallerContainerHelper);
+        finalContainer = smallerContainerHelper;
+
+        console.log("✅ Creato helper di contenimento più piccolo e VISIBILE.");
+
+    } else {
+        console.warn("ATTENZIONE: Mesh contenitore 'Box002_09_-_Default_0' non trovata!");
+    }
+
+    if (popcornSpawnPoint) {
+        popcornManager = new PopcornManager({
+            scene: scene,
+            spawnMesh: popcornSpawnPoint,
+            containerMesh: finalContainer,
+            count: 100
+        });
+        console.log(`✅ Popcorn Manager Inizializzato usando '${popcornSpawnPoint.name}' come spawn.`);
+    } else {
+        console.error("❌ ERRORE CRITICO: Nessuna mesh trovata nel modello popcorn_machine.glb.");
+    }
+
+}, undefined, (error) => {
+    console.error("❌ Errore nel caricamento della macchina per popcorn!", error);
+});
+// ======================================================================================
+
+
            
            setupPhysicsAndObjects();
            positionClaw();
@@ -854,6 +1033,11 @@ function resetObjects() {
     
     // 🆕 GAME START LOGIC (now using HomepageManager)
     function initializeGame() {
+        // 🆕 Rendi visibile l'interfaccia di gioco
+        document.getElementById('controls').style.display = 'block';
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('toggleLightControls').style.display = 'block';
+        
         cameraManager.initThirdPersonCamera(playerController);
         CameraUtils.initGlobalControls(cameraManager);
         
@@ -1077,6 +1261,13 @@ for (let i = 0; i < STAR_COUNT; i++) {
           // 🆕 UPDATE LIGHTING ANIMATIONS
           lightingManager?.update(deltaTime);
           
+
+          if (popcornManager) {
+              popcornManager.update(deltaTime);
+          }
+          
+
+
           // 🆕 UPDATE DIFFERENT SYSTEMS BASED ON GAME MODE
           switch(gameMode) {
               case 'exploration':
@@ -1140,6 +1331,15 @@ for (let i = 0; i < STAR_COUNT; i++) {
     window.applyLightPreset = function(presetName) {
         if (lightingManager) {
             lightingManager.applyLightPreset(presetName);
+
+            // 🆕 Play BGM based on preset
+            if (audioManager) {
+                if (presetName === 'dark') {
+                    audioManager.stopAllBGM();
+                } else {
+                    audioManager.playBGM(presetName);
+                }
+            }
         } else {
             console.warn("⚠️ LightingManager not initialized");
         }
