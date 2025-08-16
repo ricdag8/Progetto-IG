@@ -202,10 +202,9 @@ calculateAndSetDropHeight() {
 
 // in claw_controller.js
 
-// in claw_controller.js
 
 startDropSequence() {
-    // --- ✅ INIZIO LOGICA DI BLOCCO CON MARGINE DI SICUREZZA ---
+    // --- INIZIO LOGICA DI BLOCCO CON MARGINE DI SICUREZZA ---
     if (this.chuteBox) {
         const clawPos = this.clawGroup.position;
         const chuteBounds = this.chuteBox;

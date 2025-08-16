@@ -295,7 +295,7 @@ export class RoomSetupManager {
         console.log('🎰 Loading claw machine...');
         
         return new Promise((resolve, reject) => {
-            loader.load('claw_no_obj.glb', 
+            loader.load('glbmodels/claw_no_obj.glb', 
                 (gltf) => {
                     console.log('✅ Claw machine loaded successfully');
                     const model = gltf.scene;
@@ -489,7 +489,7 @@ export class RoomSetupManager {
         console.log('🦾 Loading claw...');
         
         return new Promise((resolve, reject) => {
-            loader.load('claw_collider.glb', 
+            loader.load('glbmodels/claw_collider.glb', 
                 (gltf) => {
                     console.log('✅ Claw loaded successfully');
                     this.clawGroup = gltf.scene;
@@ -565,7 +565,7 @@ export class RoomSetupManager {
         console.log('🍬 Loading candy machine...');
         
         return new Promise((resolve, reject) => {
-            loader.load('candy_machine_con_gate5.glb', 
+            loader.load('glbmodels/candy_machine_con_gate5.glb', 
                 (gltf) => { 
                     console.log("✅ Candy machine model loaded successfully.");
                     const model = gltf.scene;
@@ -586,9 +586,9 @@ export class RoomSetupManager {
 
                     model.traverse(child => {
                         if (child.isMesh) {
-                            const impenetrableMeshes = ['Object_3', 'Gate', 'Plane2', 'Plane3', 'Plane4'];
-                            if (impenetrableMeshes.includes(child.name)) {
-                                console.log(`🚧 Adding impenetrable mesh as static collider: ${child.name}`);
+                            // 🍬 ADD COLLISION TO ALL CANDY MACHINE MESHES (except specific exclusions)
+                            const excludedMeshes = ['Object_2']; // Container mesh - keep this traversable
+                            if (!excludedMeshes.includes(child.name)) {
                                 child.geometry.computeVertexNormals();
                                 child.geometry.computeBoundingBox();
                                 child.geometry.boundsTree = new MeshBVH(child.geometry);
@@ -645,7 +645,7 @@ export class RoomSetupManager {
                 },
                 undefined,
                 (error) => {
-                    console.error("❌ CRITICAL ERROR: Cannot load 'candy_machine.glb'.", error);
+                    console.error("❌ CRITICAL ERROR: Cannot load 'glbmodels/candy_machine_con_gate5.glb'.", error);
                     reject(error);
                 }
             );
